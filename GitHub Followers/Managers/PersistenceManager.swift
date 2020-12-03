@@ -18,43 +18,15 @@ enum PersistenceManager {
         static let favorites = "favorites"
     }
     
-    static func updateWith(favorite: Follower, actionType: PersistenceActionType, completed: @escaping (GFError?) -> Void){
-        retrieveFavorites { result in
-            switch result {
-            case .success(let favorites):
-                var retrievedFavorites = favorites
-                
-                switch actionType {
-                case .add:
-                    guard !retrievedFavorites.contains(favorite) else {
-                        completed(.alreadyFavorited)
-                        return
-                    }
-                    retrievedFavorites.append(favorite)
-                case .remove:
-                    //       remove any instance.login that is equal to favorite.login
-                    retrievedFavorites.removeAll { $0.login == favorite.login }
-                }
-                completed(save(favorites: retrievedFavorites))
-                
-            case .failure(let error):
-                completed(error)
-            }
-        }
-    }
-    
-    static func retrieveFavorites(completed: @escaping (Result<[Follower], GFError>) -> Void){
-        guard let favoritesDatas = defaults.object(forKey: Keys.favorites) as? Data else {
-            completed(.success([]))
-            return
-        }
+    static func retrieveFavorites() -> [Follower]? {
+        guard let favoritesDatas = defaults.object(forKey: Keys.favorites) as? Data else { return nil }
         do {
             let decoder = JSONDecoder()
             decoder.keyDecodingStrategy = .convertFromSnakeCase //pass from snakecase to CamelCase to fit our model variables
             let favorites = try decoder.decode([Follower].self, from: favoritesDatas)
-            completed(.success(favorites))
+            return favorites
         } catch {
-            completed(.failure(.unableToFavorite))
+            return nil
         }
     }
     
@@ -66,6 +38,24 @@ enum PersistenceManager {
             return nil
         } catch {
             return .unableToFavorite
+        }
+    }
+    
+    static func updateWith(favorite: Follower, actionType: PersistenceActionType) {
+        if var retrievedFavorites = retrieveFavorites() {
+            switch actionType {
+                case .add:
+                    if !retrievedFavorites.contains(favorite) {
+                        retrievedFavorites.append(favorite)
+                        save(favorites: retrievedFavorites)
+                    }
+                case .remove:
+                    //  remove any instance.login that is equal to favorite.login
+                    print(retrievedFavorites)
+                    retrievedFavorites.removeAll { $0.login == favorite.login }
+                    save(favorites: retrievedFavorites)
+                    print(retrievedFavorites)
+                }
         }
     }
 }
